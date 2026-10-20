@@ -11317,7 +11317,27 @@
             renderResources();
             initSpeechRecognition();
         };
-    </script>
+    
+    // CORRECTIF MASQUAGE STRICT DE L'ONGLET GYM SUR LES AUTRES PAGES
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('button');
+        const gymTab = document.getElementById('tab-gym');
+        if (!gymTab) return;
+
+        if (btn) {
+            const txt = btn.innerText || '';
+            // Si on clique sur Gym des Mains, on affiche
+            if (txt.includes('Gym des Mains')) {
+                setTimeout(() => { gymTab.style.display = 'block'; }, 20);
+            } 
+            // Si on clique sur un autre onglet principal, on masque impérativement la Gym
+            else if (txt.includes('Découvertes') || txt.includes('Poèmes') || txt.includes('Radios') || txt.includes('Notes') || txt.includes('Sons') || txt.includes('Ambiance')) {
+                gymTab.style.display = 'none';
+            }
+        }
+    });
+
+</script>
 
 <script>
 // === CORRECTIF TOTAL : TTS PAUSE/PLAY & ZOOM ===
