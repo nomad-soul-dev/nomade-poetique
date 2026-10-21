@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html lang="fr" data-theme="sepia">
 <head>
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) { registration.unregister(); }
+    });
+}
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>🌸 Nomad Poetic — Poésie, Voix & Sérénité</title>
@@ -541,9 +548,9 @@ if ('serviceWorker' in navigator) {
             </select>
 
             <!-- Variateur de taille police -->
-            <button class="btn btn-sm btn-outline" onclick="vibrer(15); changeFontSize(-2)">A-</button>
-            <span id="font-size-label" style="font-size:14px; font-weight:bold; color:var(--text-muted)">22px</span>
-            <button class="btn btn-sm btn-outline" onclick="vibrer(15); changeFontSize(2)">A+</button>
+            
+            
+            
         </div>
     </header>
 
@@ -971,9 +978,12 @@ if ('serviceWorker' in navigator) {
     <!-- ============================================ -->
     <div class="fixed-audio-player">
         <div class="audio-bar">
-            <button class="btn btn-green" onclick="vibrer(20); playAudio()">▶️ Écouter</button>
-            <button class="btn btn-blue" onclick="vibrer(20); pauseAudio()">⏸️ Pause</button>
-            <button class="btn btn-red" onclick="vibrer(20); stopAudio()">⏹️ Stop</button>
+            <button class="btn btn-green" style="padding:6px 12px; font-size:16px; border-radius:8px; font-weight:bold;" onclick="vibrer(20); playAudio()" title="Écouter">▶</button>
+            <button class="btn btn-blue" style="padding:6px 12px; font-size:16px; border-radius:8px; font-weight:bold;" onclick="vibrer(20); pauseAudio()" title="Pause">⏸</button>
+            <button class="btn btn-red" style="padding:6px 12px; font-size:16px; border-radius:8px; font-weight:bold;" onclick="vibrer(20); stopAudio()" title="Stop">⏹</button>
+            <div style="width:1px; background:rgba(255,255,255,0.25); height:20px; margin:0 4px; display:inline-block;"></div>
+            <button class="btn btn-outline" style="padding:6px 10px; font-size:13px; font-weight:bold; border-radius:8px;" onclick="vibrer(15); changeFontSize(-2)">A-</button>
+            <button class="btn btn-outline" style="padding:6px 10px; font-size:13px; font-weight:bold; border-radius:8px;" onclick="vibrer(15); changeFontSize(2)">A+</button>
         </div>
 
         <div class="controls-row">
@@ -13662,6 +13672,37 @@ if ('serviceWorker' in navigator) {
 
     setTimeout(updateGymLoopUI, 200);
 })();
+</script>
+
+
+<style id="poem-font-override">
+  #poem-display-box, #poem-display-box *, .poem-line, .poeme-vers, .poeme-strophe {
+    font-size: 22px !important;
+    line-height: 1.6 !important;
+  }
+</style>
+<script>
+function changeFontSize(delta) {
+    let saved = parseInt(localStorage.getItem('nomad_font_size'));
+    if (isNaN(saved) || !saved) saved = 22;
+
+    let newSize = Math.max(14, Math.min(40, saved + delta));
+    localStorage.setItem('nomad_font_size', newSize);
+
+    let styleEl = document.getElementById('poem-font-override');
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'poem-font-override';
+        document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = '#poem-display-box, #poem-display-box *, .poem-line, .poeme-vers, .poeme-strophe { font-size: ' + newSize + 'px !important; line-height: 1.6 !important; }';
+}
+
+window.changeFontSize = changeFontSize;
+
+document.addEventListener('DOMContentLoaded', function() {
+    changeFontSize(0);
+});
 </script>
 
 </body>
