@@ -11162,7 +11162,560 @@ if ('serviceWorker' in navigator) {
         let recognition = null;
         let isListening = false;
 
-        )();
+        function initSpeechRecognition() {
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SR) {
+                recognition = new SR();
+                recognition.lang = 'fr-FR';
+                recognition.continuous = true;
+                recognition.interimResults = true;
+
+                recognition.onresult = (event) => {
+                    let final = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) final += event.results[i][0].transcript + ' ';
+                    }
+                    if (final) {
+                        const input = document.getElementById('note-input');
+                        input.value += (input.value ? ' ' : '') + final;
+                    }
+                };
+
+                recognition.onend = () => {
+                    isListening = false;
+                    const btn = document.getElementById('btn-dictation');
+                    if (btn) btn.innerText = '🎤 Démarrer la Dictée Vocale';
+                };
+            }
+        }
+
+        function toggleDictation() {
+            const input = document.getElementById('note-input');
+            const btn = document.getElementById('btn-dictation');
+            if (!recognition) {
+                input.focus();
+                return customAlert("Dictée vocale", "Touchez le champ de saisie ci-dessous puis appuyez sur le micro 🎙️ de votre clavier.");
+            }
+
+            if (isListening) {
+                recognition.stop();
+                isListening = false;
+                btn.innerText = '🎤 Démarrer la Dictée Vocale';
+            } else {
+                try {
+                    recognition.start();
+                    isListening = true;
+                    btn.innerText = '🛑 Écoute en cours... Touchez pour arrêter';
+                } catch(e) {
+                    isListening = false;
+                    btn.innerText = '🎤 Démarrer la Dictée Vocale';
+                }
+            }
+        }
+
+        function sauvegarderNoteTexte() {
+            const input = document.getElementById('note-input');
+            const txt = input.value.trim();
+            if (!txt) return customAlert("Note vide", "Veuillez écrire ou dicter quelques mots avant d'enregistrer.");
+
+            const dateStr = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+            savedNotes.unshift({ id: Date.now(), date: dateStr, texte: txt });
+            localStorage.setItem('nomad_saved_notes', JSON.stringify(savedNotes));
+
+            input.value = '';
+            afficherNotes();
+            customAlert("Enregistré !", "Votre texte a été conservé dans votre carnet personnel.");
+        }
+
+        function copierNote() {
+            const input = document.getElementById('note-input');
+            if (input.value) {
+                navigator.clipboard.writeText(input.value).then(() => {
+                    customAlert("Copié !", "Le texte de votre note a été copié.");
+                });
+            }
+        }
+
+        function afficherNotes() {
+            const cont = document.getElementById('saved-notes-list');
+            if (!cont) return;
+            cont.innerHTML = '<b style="color:var(--accent);">Mes Notes Sauvegardées :</b>';
+
+            if (savedNotes.length === 0) {
+                cont.innerHTML += '<div style="font-size:14px; color:var(--text-muted); margin-top:6px;">Aucune note enregistrée.</div>';
+                return;
+            }
+
+            savedNotes.forEach(n => {
+                const div = document.createElement('div');
+                div.style.cssText = "background:var(--bg-elevated); padding:10px; border-radius:10px; border:1px solid var(--border-color); margin-top:8px;";
+                div.innerHTML = `
+                    <div style="font-size:12px; color:var(--accent); font-weight:bold;">🕒 Le ${n.date}</div>
+                    <div style="margin:6px 0; white-space:pre-wrap; font-family:var(--font-serif);">${n.texte}</div>
+                    <div style="text-align:right;">
+                        <button class="btn btn-sm btn-red" style="padding:2px 8px; font-size:12px;" onclick="vibrer(20); effacerNote(${n.id})">Effacer</button>
+                    </div>
+                `;
+                cont.appendChild(div);
+            });
+        }
+
+        function effacerNote(id) {
+            savedNotes = savedNotes.filter(n => n.id !== id);
+            localStorage.setItem('nomad_saved_notes', JSON.stringify(savedNotes));
+            afficherNotes();
+        }
+
+        // --- 10. RESSOURCES LITTÉRAIRES ---
+        function renderResources() {
+            const cont = document.getElementById('resources-container');
+            if (!cont) return;
+            cont.innerHTML = '';
+            resourcesData.forEach(r => {
+                const card = document.createElement('div');
+                card.style.cssText = "background:var(--bg-elevated); border:1px solid var(--border-color); padding:14px; border-radius:12px;";
+                card.innerHTML = `
+                    <span style="display:inline-block; font-size:12px; font-weight:bold; background:var(--accent); color:#fff; padding:2px 8px; border-radius:6px; margin-bottom:6px;">${r.theme}</span>
+                    <h3 style="color:var(--text-main); margin:0 0 6px 0;">${r.titre}</h3>
+                    <p style="font-size:15px; margin:0 0 8px 0; line-height:1.5;">${r.desc}</p>
+                    <div style="font-style:italic; font-family:var(--font-serif); color:var(--accent); font-size:14px;">${r.citation}</div>
+                `;
+                cont.appendChild(card);
+            });
+        }
+
+        // --- 11. GYMNASTIQUE DES DOIGTS ---
+        const nomsDoigts = ["Pouce", "Index", "Majeur", "Annulaire", "Auriculaire"];
+        let targetFinger = 0;
+        let pressCount = 0;
+
+        function initPianoGym() {
+            targetFinger = Math.floor(Math.random() * 5);
+            document.getElementById('target-finger-name').innerText = nomsDoigts[targetFinger];
+            updatePianoUI();
+        }
+
+        function updatePianoUI() {
+            for (let i = 0; i < 5; i++) {
+                const el = document.getElementById(`key-${i}`);
+                if (el) {
+                    if (i === targetFinger) el.classList.add('target-key');
+                    else el.classList.remove('target-key');
+                }
+            }
+        }
+
+        function pressPianoKey(idx) {
+            const score = document.getElementById('piano-score');
+            if (idx === targetFinger) {
+                score.innerText = "✨ Bravo ! Doigt suivant...";
+                setTimeout(initPianoGym, 350);
+            } else {
+                score.innerText = "💡 Essayez de toucher : " + nomsDoigts[targetFinger];
+            }
+        }
+
+        function pressCircleAct() {
+            pressCount++;
+            document.getElementById('press-count').innerText = `Réalisés : ${pressCount} fois`;
+        }
+
+        // --- INITIALISATION GLOBALE AU CHARGEMENT ---
+        window.onload = () => {
+            const savedTheme = localStorage.getItem('nomad_theme') || 'sepia';
+            document.getElementById('theme-select').value = savedTheme;
+            changeTheme(savedTheme);
+
+            changeFontSize(0);
+            popoulerAuteurs();
+            filtrerPoemes();
+            renderRadios();
+            renderResources();
+            initSpeechRecognition();
+        };
+    
+    // CORRECTIF MASQUAGE STRICT DE L'ONGLET GYM SUR LES AUTRES PAGES
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('button');
+        const gymTab = document.getElementById('tab-gym');
+        if (!gymTab) return;
+
+        if (btn) {
+            const txt = btn.innerText || '';
+            // Si on clique sur Gym des Mains, on affiche
+            if (txt.includes('Gym des Mains')) {
+                setTimeout(() => { gymTab.style.display = 'block'; }, 20);
+            } 
+            // Si on clique sur un autre onglet principal, on masque impérativement la Gym
+            else if (txt.includes('Découvertes') || txt.includes('Poèmes') || txt.includes('Radios') || txt.includes('Notes') || txt.includes('Sons') || txt.includes('Ambiance')) {
+                gymTab.style.display = 'none';
+            }
+        }
+    });
+
+</script>
+
+<script>
+// === CORRECTIF TOTAL : TTS PAUSE/PLAY & ZOOM ===
+(function() {
+    window.ttsState = {
+        currentIndex: 0,
+        paragraphs: [],
+        isPlaying: false,
+        isPaused: false,
+        userCancelled: false
+    };
+
+    window.changeFontSize = function(delta) {
+        const box = document.getElementById('poem-display-box');
+        if (!box) return;
+        
+        let currentSize = parseFloat(window.getComputedStyle(box).fontSize) || 18;
+        let newSize = Math.min(Math.max(currentSize + delta, 12), 40);
+        
+        box.style.fontSize = newSize + 'px';
+        box.querySelectorAll('*').forEach(el => {
+            el.style.fontSize = newSize + 'px';
+        });
+
+        const label = document.getElementById('font-size-label');
+        if (label) label.innerText = Math.round(newSize) + 'px';
+    };
+
+    function getParagraphs() {
+        const box = document.getElementById('poem-display-box');
+        if (!box) return [];
+        let pList = Array.from(box.querySelectorAll('p'));
+        if (pList.length === 0) {
+            pList = Array.from(box.children).filter(c => c.innerText.trim().length > 0);
+        }
+        return pList;
+    }
+
+    function speakCurrentIndex() {
+        const state = window.ttsState;
+        if (state.currentIndex < 0 || state.currentIndex >= state.paragraphs.length) {
+            state.isPlaying = false;
+            state.isPaused = false;
+            return;
+        }
+
+        state.userCancelled = true;
+        window.speechSynthesis.cancel();
+        state.userCancelled = false;
+
+        const el = state.paragraphs[state.currentIndex];
+        state.paragraphs.forEach((p, idx) => {
+            if (p.style) p.style.backgroundColor = (idx === state.currentIndex) ? 'rgba(234, 179, 8, 0.3)' : 'transparent';
+        });
+
+        if (el.scrollIntoView) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        const utterance = new SpeechSynthesisUtterance(el.innerText);
+        utterance.lang = 'fr-FR';
+
+        utterance.onend = function() {
+            if (!state.userCancelled && state.isPlaying && !state.isPaused) {
+                state.currentIndex++;
+                speakCurrentIndex();
+            }
+        };
+
+        utterance.onerror = function() {
+            if (!state.userCancelled) {
+                state.isPlaying = false;
+                state.isPaused = false;
+            }
+        };
+
+        state.isPlaying = true;
+        state.isPaused = false;
+        window.speechSynthesis.speak(utterance);
+    }
+
+    window.playAudio = function() {
+        const state = window.ttsState;
+        state.paragraphs = getParagraphs();
+        if (state.paragraphs.length === 0) return;
+
+        if (state.isPaused) {
+            state.isPaused = false;
+            speakCurrentIndex();
+        } else if (!state.isPlaying) {
+            state.currentIndex = 0;
+            speakCurrentIndex();
+        }
+    };
+
+    window.pauseAudio = function() {
+        const state = window.ttsState;
+        if (state.isPlaying) {
+            state.userCancelled = true;
+            window.speechSynthesis.cancel();
+            state.isPaused = true;
+            state.isPlaying = false;
+        }
+    };
+
+    window.stopAudio = function() {
+        const state = window.ttsState;
+        state.userCancelled = true;
+        window.speechSynthesis.cancel();
+        state.isPlaying = false;
+        state.isPaused = false;
+        state.currentIndex = 0;
+        state.paragraphs.forEach(p => { if (p.style) p.style.backgroundColor = 'transparent'; });
+    };
+
+    document.addEventListener('click', function(e) {
+        const box = document.getElementById('poem-display-box');
+        if (box && box.contains(e.target)) {
+            const state = window.ttsState;
+            state.paragraphs = getParagraphs();
+            let parentP = e.target.closest('p, div');
+            let idx = state.paragraphs.indexOf(parentP || e.target);
+            if (idx !== -1) {
+                state.currentIndex = idx;
+                speakCurrentIndex();
+            }
+        }
+    });
+})();
+</script>
+
+<script>
+// === MODULE RADIO ENRICHI (SURCHARGE PROPRE) ===
+(function() {
+    window.savedFavRadios = JSON.parse(localStorage.getItem('nomad_fav_radios') || '[]');
+    window.currentRadioCategory = 'tous';
+
+    window.radiosData = [
+        { id: 'reunion1ere', nom: 'Réunion La 1ère', cat: 'reunion', desc: 'Actualités, maloya, séga 974', url: 'https://reunion.ice.infomaniak.ch/reunion-128.mp3' },
+        { id: 'freedom1', nom: 'Radio Free Dom 1', cat: 'reunion', desc: 'La voix populaire de La Réunion', url: 'https://freedomice.streamakaci.com/freedom.mp3' },
+        { id: 'freedom2', nom: 'Radio Free Dom 2', cat: 'reunion', desc: 'Séga, souvenirs & chansons créoles', url: 'https://freedomice.streamakaci.com/freedom2.mp3' },
+        { id: 'cherie-reunion', nom: 'Chérie FM Réunion', cat: 'reunion', desc: 'Tubes romantiques et douceur', url: 'https://streamingp.shoutcast.com/cheriefmreunion' },
+        { id: 'rtl-reunion', nom: 'RTL Réunion', cat: 'reunion', desc: 'Informations régionales et musique', url: 'https://stream.rtlreunion.net/listen/rtl_reunion/radio.mp3' },
+        { id: 'exo-fm', nom: 'Exo FM Réunion', cat: 'reunion', desc: 'Soleil, séga, reggae & zouk', url: 'https://exofm.ice.infomaniak.ch/exofm-128.mp3' },
+        { id: 'urban-hit', nom: 'Urban Hit Réunion', cat: 'reunion', desc: 'Hits urbains & jeunesse', url: 'https://urbanhit.ice.infomaniak.ch/urbanhit-128.mp3' },
+        
+        { id: 'france-culture', nom: 'France Culture', cat: 'france', desc: 'Savoirs, littérature et débats', url: 'https://stream.radiofrance.fr/franceculture/franceculture_hifi.mp3' },
+        { id: 'fip', nom: 'FIP Radio', cat: 'france', desc: 'Électlectique, jazz, world & pop', url: 'https://stream.radiofrance.fr/fip/fip_hifi.mp3' },
+        { id: 'france-inter', nom: 'France Inter', cat: 'france', desc: 'Grande radio généraliste', url: 'https://stream.radiofrance.fr/franceinter/franceinter_hifi.mp3' },
+        { id: 'france-info', nom: 'France Info', cat: 'info', desc: 'L’actualité en direct 24/7', url: 'https://stream.radiofrance.fr/franceinfo/franceinfo_hifi.mp3' },
+        
+        { id: 'radio-classique', nom: 'Radio Classique', cat: 'classique', desc: 'Musique classique et apaisante', url: 'https://radioclassique.ice.infomaniak.ch/radioclassique-high.mp3' },
+        { id: 'france-musique', nom: 'France Musique', cat: 'classique', desc: 'Symphonies, opéra & sérénité', url: 'https://stream.radiofrance.fr/francemusique/francemusique_hifi.mp3' },
+        
+        { id: 'radio-presence', nom: 'Radio Présence', cat: 'priere', desc: 'Prières, spiritualité & spiritual', url: 'https://radiopresence.ice.infomaniak.ch/radiopresence-128.mp3' },
+        { id: 'rcf', nom: 'RCF Radio', cat: 'priere', desc: 'Radio chrétienne & humanisme', url: 'https://rcf.streamakaci.com/rcf.mp3' },
+        { id: 'radio-notre-dame', nom: 'Radio Notre Dame', cat: 'priere', desc: 'Foi, culture & méditation', url: 'https://radionotredame.ice.infomaniak.ch/radionotredame-128.mp3' },
+
+        { id: 'rtl2', nom: 'RTL2 France', cat: 'france', desc: 'Le son pop-rock', url: 'https://streaming.radioline.fr/framer/stream.php?id=rtl2' },
+        { id: 'nostalgie', nom: 'Nostalgie France', cat: 'france', desc: 'Les plus grands chansons', url: 'https://cdn.nrjaudio.fm/audio/1/fr/30601/mp3_128.mp3' }
+    ];
+
+    window.isRadioFav = function(id) {
+        return window.savedFavRadios.some(r => r.id === id);
+    };
+
+    window.toggleFavRadio = function(radioObj, e) {
+        if (e) e.stopPropagation();
+        const idx = window.savedFavRadios.findIndex(r => r.id === radioObj.id);
+        if (idx !== -1) {
+            window.savedFavRadios.splice(idx, 1);
+        } else {
+            window.savedFavRadios.push(radioObj);
+        }
+        localStorage.setItem('nomad_fav_radios', JSON.stringify(window.savedFavRadios));
+        window.renderRadios();
+    };
+
+    window.updateFavBadgeCount = function() {
+        const el = document.getElementById('fav-radio-count');
+        if (el) el.innerText = window.savedFavRadios.length;
+    };
+
+    window.filtrerCatRadio = function(cat, btnEl) {
+        window.currentRadioCategory = cat;
+        document.querySelectorAll('.radio-cat-btn').forEach(b => {
+            b.classList.remove('btn-accent');
+            b.classList.add('btn-outline');
+        });
+        if (btnEl) {
+            btnEl.classList.remove('btn-outline');
+            btnEl.classList.add('btn-accent');
+        }
+        
+        const apiSec = document.getElementById('api-radios-section');
+        if (cat === 'api') {
+            if (apiSec) apiSec.style.display = 'block';
+        } else {
+            if (apiSec) apiSec.style.display = 'none';
+        }
+        window.renderRadios();
+    };
+
+    window.filtrerRadiosLocales = function() {
+        window.renderRadios();
+    };
+
+    window.renderRadios = function() {
+        const container = document.getElementById('radios-container');
+        if (!container) return;
+
+        window.updateFavBadgeCount();
+        const searchTxt = (document.getElementById('radio-search-input')?.value || '').toLowerCase().trim();
+
+        let listToDisplay = [];
+        if (window.currentRadioCategory === 'fav') {
+            listToDisplay = window.savedFavRadios;
+        } else if (window.currentRadioCategory === 'tous') {
+            listToDisplay = [...window.radiosData];
+            window.savedFavRadios.forEach(fav => {
+                if (!listToDisplay.some(r => r.id === fav.id)) {
+                    listToDisplay.push(fav);
+                }
+            });
+        } else if (window.currentRadioCategory === 'api') {
+            listToDisplay = [];
+        } else {
+            listToDisplay = window.radiosData.filter(r => r.cat === window.currentRadioCategory);
+        }
+
+        if (searchTxt) {
+            listToDisplay = listToDisplay.filter(r => 
+                (r.nom || '').toLowerCase().includes(searchTxt) || 
+                (r.desc || '').toLowerCase().includes(searchTxt)
+            );
+        }
+
+        container.innerHTML = '';
+        if (listToDisplay.length === 0 && window.currentRadioCategory !== 'api') {
+            container.innerHTML = '<div style="grid-column:1/-1; padding:20px; text-align:center; color:var(--text-muted); font-size:15px;">Aucune radio ne correspond à votre sélection ou vos favoris.</div>';
+            return;
+        }
+
+        listToDisplay.forEach(r => {
+            const isFav = window.isRadioFav(r.id);
+            const card = document.createElement('div');
+            card.className = 'radio-card';
+            card.id = 'rad-' + r.id;
+            card.style.cssText = "background:var(--bg-elevated); border:1px solid var(--border-color); padding:12px; border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; position:relative; cursor:pointer;";
+            
+            card.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <b style="color:var(--text-main); font-size:16px; padding-right:24px;">${r.nom}</b>
+                    <button style="background:none; border:none; font-size:22px; cursor:pointer; padding:0; line-height:1;" 
+                            onclick="toggleFavRadio(${JSON.stringify(r).replace(/"/g, '&quot;')}, event)" title="Ajouter aux favoris">
+                        ${isFav ? '⭐' : '☆'}
+                    </button>
+                </div>
+                <div style="font-size:13px; color:var(--text-muted); margin:6px 0 10px 0;">${r.desc || 'Radio en direct'}</div>
+                <div style="color:var(--accent); font-size:14px; font-weight:bold;">▶️ Écouter en direct</div>
+            `;
+
+            card.onclick = (e) => {
+                if (e.target.tagName !== 'BUTTON') {
+                    if (typeof vibrer === 'function') vibrer(20);
+                    window.playRadio(r);
+                }
+            };
+
+            container.appendChild(card);
+        });
+    };
+
+    window.playRadio = function(radio) {
+        const player = document.getElementById('live-radio-audio');
+        const box = document.getElementById('active-radio-box');
+        const nameEl = document.getElementById('active-radio-name');
+
+        if (!player || !box || !nameEl) return;
+
+        document.querySelectorAll('.radio-card').forEach(c => c.classList.remove('active-item'));
+        const card = document.getElementById('rad-' + radio.id);
+        if (card) card.classList.add('active-item');
+
+        nameEl.innerText = radio.nom;
+        box.style.display = 'block';
+
+        player.src = radio.url;
+        player.play().catch(e => {
+            if (typeof customAlert === 'function') customAlert("Radio", "Connexion au flux en cours ou flux indisponible.");
+        });
+    };
+
+    window.stopRadio = function() {
+        const player = document.getElementById('live-radio-audio');
+        if (player) {
+            player.pause();
+            player.src = '';
+        }
+        const box = document.getElementById('active-radio-box');
+        if (box) box.style.display = 'none';
+        document.querySelectorAll('.radio-card').forEach(c => c.classList.remove('active-item'));
+    };
+
+    window.rechercherRadiosMonde = async function() {
+        const query = (document.getElementById('radio-search-input')?.value || 'France').trim();
+        const apiContainer = document.getElementById('api-radios-container');
+        if (!apiContainer) return;
+
+        apiContainer.innerHTML = '<div style="grid-column:1/-1; padding:15px; color:var(--accent);">🔍 Recherche des stations dans le monde en cours...</div>';
+
+        try {
+            const res = await fetch(`https://de1.api.radio-browser.info/json/stations/byname/${encodeURIComponent(query)}?limit=20`);
+            const data = await res.json();
+
+            apiContainer.innerHTML = '';
+            if (!data || data.length === 0) {
+                apiContainer.innerHTML = '<div style="grid-column:1/-1; padding:15px; color:var(--text-muted);">Aucune station trouvée pour cette recherche.</div>';
+                return;
+            }
+
+            data.forEach(item => {
+                if (!item.url_resolved && !item.url) return;
+                const rObj = {
+                    id: 'api-' + (item.stationuuid || Math.random().toString(36).substr(2, 9)),
+                    nom: item.name || 'Station Inconnue',
+                    desc: (item.country || '') + (item.tags ? ' • ' + item.tags.split(',').slice(0, 2).join(', ') : ''),
+                    url: item.url_resolved || item.url,
+                    cat: 'api'
+                };
+
+                const isFav = window.isRadioFav(rObj.id);
+                const card = document.createElement('div');
+                card.className = 'radio-card';
+                card.style.cssText = "background:var(--bg-elevated); border:1px solid var(--border-color); padding:12px; border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; cursor:pointer;";
+                
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <b style="color:var(--text-main); font-size:15px; padding-right:20px;">${rObj.nom}</b>
+                        <button style="background:none; border:none; font-size:22px; cursor:pointer; padding:0;" 
+                                onclick="toggleFavRadio(${JSON.stringify(rObj).replace(/"/g, '&quot;')}, event)">
+                            ${isFav ? '⭐' : '☆'}
+                        </button>
+                    </div>
+                    <div style="font-size:12px; color:var(--text-muted); margin:6px 0 10px 0;">${rObj.desc}</div>
+                    <div style="color:var(--accent); font-size:13px; font-weight:bold;">▶️ Écouter le flux</div>
+                `;
+
+                card.onclick = (e) => {
+                    if (e.target.tagName !== 'BUTTON') {
+                        if (typeof vibrer === 'function') vibrer(20);
+                        window.playRadio(rObj);
+                    }
+                };
+
+                apiContainer.appendChild(card);
+            });
+        } catch(e) {
+            apiContainer.innerHTML = '<div style="grid-column:1/-1; padding:15px; color:var(--text-red);">Erreur lors de la connexion à l’API Radio. Vérifiez votre connexion internet.</div>';
+        }
+    };
+})();
 </script>
 <script>
 // === MODULE AMBIANCES SONORES ENRICHI (HD STREAM + FALLBACK PROCEDURAL) ===
@@ -13154,79 +13707,50 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 <script>
-window.recognitionInstance = null;
-window.isSpeechListening = false;
+if (typeof window.toggleDictation !== 'function') {
+    window.toggleDictation = function() {
+        const input = document.getElementById('note-input');
+        const btn = document.getElementById('btn-dictation');
+        const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-function stopDictationUI() {
-    window.isSpeechListening = false;
-    const btn = document.getElementById('btn-dictation');
-    if (btn) {
-        btn.innerText = '🎤 Démarrer la Dictée Vocale';
-        btn.style.background = '#10b981';
-    }
-}
-
-function toggleDictation() {
-    const input = document.getElementById('note-input');
-    const btn = document.getElementById('btn-dictation');
-
-    const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechClass) {
-        if (input) input.focus();
-        return customAlert("Dictée vocale", "Votre navigateur ne prend pas en charge la reconnaissance vocale automatique. Touchez le champ puis appuyez sur le micro 🎙️ du clavier.");
-    }
-
-    if (!window.recognitionInstance) {
-        try {
-            window.recognitionInstance = new SpeechClass();
-            window.recognitionInstance.continuous = true;
-            window.recognitionInstance.interimResults = true;
-            window.recognitionInstance.lang = 'fr-FR';
-
-            window.recognitionInstance.onstart = function() {
-                window.isSpeechListening = true;
-                if (btn) {
-                    btn.innerText = '🛑 Écoute en cours... Touchez pour arrêter';
-                    btn.style.background = '#ef4444';
-                }
-            };
-
-            window.recognitionInstance.onresult = function(event) {
-                if (!input) return;
-                let transcript = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    transcript += event.results[i][0].transcript;
-                }
-                if (transcript) input.value = transcript;
-            };
-
-            window.recognitionInstance.onerror = function(e) {
-                console.error("Erreur micro:", e);
-                stopDictationUI();
-            };
-
-            window.recognitionInstance.onend = function() {
-                stopDictationUI();
-            };
-        } catch(err) {
-            console.error("Erreur init:", err);
+        if (!SpeechClass) {
             if (input) input.focus();
-            return customAlert("Dictée vocale", "Impossible d'activer le micro. Utilisez le micro du clavier.");
+            return customAlert("Dictée vocale", "Votre navigateur ne prend pas en charge la reconnaissance vocale. Touchez le champ pour utiliser le clavier.");
         }
-    }
 
-    if (window.isSpeechListening) {
-        window.recognitionInstance.stop();
-        stopDictationUI();
-    } else {
-        try {
-            window.recognitionInstance.start();
-        } catch(e) {
-            console.error("Erreur start:", e);
-            stopDictationUI();
+        if (!window.recObj) {
+            try {
+                window.recObj = new SpeechClass();
+                window.recObj.continuous = true;
+                window.recObj.interimResults = true;
+                window.recObj.lang = 'fr-FR';
+
+                window.recObj.onstart = function() {
+                    window.isRecActive = true;
+                    if (btn) { btn.innerText = '🛑 Écoute en cours... Touchez pour arrêter'; btn.style.background = '#ef4444'; }
+                };
+                window.recObj.onresult = function(e) {
+                    if (!input) return;
+                    let txt = '';
+                    for (let i = e.resultIndex; i < e.results.length; ++i) { txt += e.results[i][0].transcript; }
+                    if (txt) input.value = txt;
+                };
+                window.recObj.onerror = function() { window.isRecActive = false; if (btn) { btn.innerText = '🎤 Démarrer la Dictée Vocale'; btn.style.background = '#10b981'; } };
+                window.recObj.onend = function() { window.isRecActive = false; if (btn) { btn.innerText = '🎤 Démarrer la Dictée Vocale'; btn.style.background = '#10b981'; } };
+            } catch(err) {
+                if (input) input.focus();
+                return customAlert("Dictée vocale", "Impossible d'initialiser le micro.");
+            }
         }
-    }
+
+        if (window.isRecActive) {
+            window.recObj.stop();
+            window.isRecActive = false;
+            if (btn) { btn.innerText = '🎤 Démarrer la Dictée Vocale'; btn.style.background = '#10b981'; }
+        } else {
+            try { window.recObj.start(); } catch(e) { window.isRecActive = false; }
+        }
+    };
 }
 </script>
 
