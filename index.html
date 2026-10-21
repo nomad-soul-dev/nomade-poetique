@@ -13754,5 +13754,82 @@ if (typeof window.toggleDictation !== 'function') {
 }
 </script>
 
+
+<script>
+window.toggleDictation = function() {
+    const input = document.getElementById('note-input');
+    const btn = document.getElementById('btn-dictation');
+    const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechClass) {
+        if (input) input.focus();
+        return customAlert("Dictée vocale", "Votre navigateur ne prend pas en charge la reconnaissance vocale automatique. Touchez le champ puis appuyez sur le micro 🎙️ du clavier.");
+    }
+
+    if (!window.recInstance) {
+        try {
+            window.recInstance = new SpeechClass();
+            window.recInstance.continuous = true;
+            window.recInstance.interimResults = true;
+            window.recInstance.lang = 'fr-FR';
+
+            window.recInstance.onstart = function() {
+                window.isRecordingNow = true;
+                if (btn) {
+                    btn.innerText = '🛑 Écoute en cours... Touchez pour arrêter';
+                    btn.style.background = '#ef4444';
+                }
+            };
+
+            window.recInstance.onresult = function(e) {
+                if (!input) return;
+                let txt = '';
+                for (let i = e.resultIndex; i < e.results.length; ++i) {
+                    txt += e.results[i][0].transcript;
+                }
+                if (txt) input.value = txt;
+            };
+
+            window.recInstance.onerror = function(e) {
+                console.error("Erreur dictée:", e);
+                window.isRecordingNow = false;
+                if (btn) {
+                    btn.innerText = '🎤 Démarrer la Dictée Vocale';
+                    btn.style.background = '#10b981';
+                }
+            };
+
+            window.recInstance.onend = function() {
+                window.isRecordingNow = false;
+                if (btn) {
+                    btn.innerText = '🎤 Démarrer la Dictée Vocale';
+                    btn.style.background = '#10b981';
+                }
+            };
+        } catch(err) {
+            console.error("Erreur instanciation SpeechClass:", err);
+            if (input) input.focus();
+            return customAlert("Dictée vocale", "Impossible d'accéder au micro.");
+        }
+    }
+
+    if (window.isRecordingNow) {
+        window.recInstance.stop();
+        window.isRecordingNow = false;
+        if (btn) {
+            btn.innerText = '🎤 Démarrer la Dictée Vocale';
+            btn.style.background = '#10b981';
+        }
+    } else {
+        try {
+            window.recInstance.start();
+        } catch(e) {
+            console.error("Erreur démarrage micro:", e);
+            window.isRecordingNow = false;
+        }
+    }
+};
+</script>
+
 </body>
 </html>
